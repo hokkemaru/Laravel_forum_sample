@@ -1,0 +1,56 @@
+<?php
+namespace App\Libs;
+use App\Models\ForumPostComment;
+
+class GetComments {
+    private $comments = array();
+    private $parent_ids = array();
+    private $comment_bottom = array();
+    public function __construct($id)
+    {
+        //対象のコメントを全件取得
+        $this->comments = ForumPostComment::where('forum_post_id', '=', $id)->get()->toArray();
+        //対象のコメントから親IDを抽出
+        foreach($this->comments as $comment) {
+            $this->parent_ids[] = $comment['parent_id'];
+        }
+        //コメントの木構造の最下層を取得する。
+        foreach($this->comments as $comment) {
+            if(!in_array($comment['id'], $this->parent_ids)) {
+                $this->comment_bottom[] = $comment['id'];
+            }
+        }
+
+    }
+
+    public function list_page_render() {
+        $commentAll = array();
+        foreach($this->comment_bottom as $comment_id) {
+            $commentGroup = $this->set_ids($comment_id, $this->comments);
+            foreach($commentGroup as $comment) {
+                $commentAll[] = $comment;
+            }
+        }
+        //全てのコメントを掘り下げた後、整列を行う。
+        $commentList = array();
+        //まずcommentAllをid順に並び替える。
+        $ids = array_column($commentAll, 'id');
+        array_multisort($ids, SORT_ASC, $commentAll);
+        dd($commentAll);
+    }
+
+    private function set_ids($id, $comments, $args = array()) {
+        if($id == 0) {
+            return array_reverse($args);
+        } else {
+            $keyIndex = array_search($id, array_column($comments, 'id'));
+            $args[] = $comments[$keyIndex];
+        }
+        foreach($comments as $comment) {
+            if($comment['id'] == $id) {
+                return $this->set_ids($comment['parent_id'], $comments, $args);
+            }
+        }
+    }
+
+}
